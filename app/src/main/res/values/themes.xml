@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.MyLauncher" parent="Theme.MaterialComponents.Light" />
+</resources>
