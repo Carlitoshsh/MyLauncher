@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
 import com.example.mylauncher.data.AppDataSource
 import com.example.mylauncher.data.local.ShortcutsDataStore
+import com.example.mylauncher.data.local.SettingsDataStore
 import com.example.mylauncher.ui.screens.AppDrawerScreen
 import com.example.mylauncher.ui.screens.HomeScreen
 import com.example.mylauncher.ui.screens.SettingsScreen
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
         val appDataSource = AppDataSource(applicationContext)
         val shortcutsDataStore = ShortcutsDataStore(applicationContext)
+        val settingsDataStore = SettingsDataStore(applicationContext)
         val appDrawerViewModelFactory = AppDrawerViewModelFactory(appDataSource, shortcutsDataStore)
         val appDrawerViewModel = ViewModelProvider(this, appDrawerViewModelFactory).get(AppDrawerViewModel::class.java)
         val homeViewModelFactory = HomeViewModelFactory(appDataSource, shortcutsDataStore)
@@ -82,7 +84,8 @@ class MainActivity : ComponentActivity() {
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(2)
                                 }
-                            }
+                            },
+                            settingsDataStore = settingsDataStore
                         )
                         1 -> HomeScreen(
                             viewModel = homeViewModel,
@@ -97,7 +100,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onAppClick = launchApp,
-                            permissionState = permissionState
+                            permissionState = permissionState,
+                            settingsDataStore = settingsDataStore
                         )
                         2 -> AppDrawerScreen(
                             viewModel = appDrawerViewModel,
