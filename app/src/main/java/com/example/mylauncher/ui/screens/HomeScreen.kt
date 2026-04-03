@@ -1,7 +1,6 @@
 package com.example.mylauncher.ui.screens
 
 import android.app.WallpaperManager
-import android.graphics.drawable.Drawable
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
@@ -48,6 +47,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 
+import android.graphics.drawable.Drawable
+
+
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -69,6 +71,7 @@ fun HomeScreen(
     } else {
         null
     }
+
 
     Box(
         modifier = Modifier
@@ -134,7 +137,7 @@ fun HomeScreen(
                         for (i in 0 until 5) {
                             val app = shortcuts.getOrNull(i)
                             var showOptionsForItem by remember { mutableStateOf(false) }
-                            var optionsForItem by remember { mutableStateOf(listOf<Pair<String, () -> Unit>>()) }
+                            var optionsForItem by remember { mutableStateOf(listOf<ShortcutOption>()) }
 
                                     Column(
                                     modifier = Modifier
@@ -145,15 +148,29 @@ fun HomeScreen(
                                             onClick = { app?.let { onAppClick(it.packageName) } },
                                                 onLongClick = {
                                                     if (app != null) {
-                                                        val opts = mutableListOf<Pair<String, () -> Unit>>()
+                                                        val opts = mutableListOf<ShortcutOption>()
                                                         try {
                                                             val launcherApps = context.getSystemService(LauncherApps::class.java)
-                                                            val query = LauncherApps.ShortcutQuery().setPackage(app.packageName)
+                                                            val query = LauncherApps.ShortcutQuery()
+                                                                .setPackage(app.packageName)
+                                                                .setQueryFlags(
+                                                                    LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                                                                            LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                                                                            LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                                                                )
                                                             val shortcutsList = launcherApps?.getShortcuts(query, Process.myUserHandle())
                                                             if (!shortcutsList.isNullOrEmpty()) {
                                                                 shortcutsList.forEach { s ->
                                                                     val label = s.shortLabel?.toString() ?: s.longLabel?.toString() ?: s.id
-                                                                    opts.add(label to {
+                                                                    var shortcutIcon: Drawable? = null
+                                                                    try {
+                                                                        val getIconMethod = s::class.java.getMethod("getIcon")
+                                                                        val iconObj = getIconMethod.invoke(s)
+                                                                        if (iconObj is android.graphics.drawable.Icon) {
+                                                                            shortcutIcon = iconObj.loadDrawable(context)
+                                                                        }
+                                                                    } catch (_: Exception) { }
+                                                                    opts.add(ShortcutOption(label, shortcutIcon) {
                                                                         try {
                                                                             launcherApps.startShortcut(app.packageName, s.id, null, null, Process.myUserHandle())
                                                                         } catch (_: Exception) { }
@@ -161,8 +178,8 @@ fun HomeScreen(
                                                                 }
                                                             }
                                                         } catch (_: Exception) { }
-                                                        opts.add("Open" to { onAppClick(app.packageName) })
-                                                        opts.add("App info" to {
+                                                        opts.add(ShortcutOption("Open", null) { onAppClick(app.packageName) })
+                                                        opts.add(ShortcutOption("App info", null) {
                                                             try {
                                                                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${app.packageName}".toUri())
                                                                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -203,12 +220,22 @@ fun HomeScreen(
                                 confirmButton = {},
                                 text = {
                                     Column {
-                                        optionsForItem.forEach { (label, action) ->
+                                        optionsForItem.forEach { opt ->
                                             TextButton(onClick = {
-                                                action()
+                                                opt.action()
                                                 showOptionsForItem = false
                                             }) {
-                                                Text(label)
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    if (opt.icon != null) {
+                                                        Image(
+                                                            bitmap = opt.icon.toBitmap().asImageBitmap(),
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(24.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                    }
+                                                    Text(opt.label)
+                                                }
                                             }
                                         }
                                     }
@@ -270,7 +297,7 @@ fun HomeScreen(
 fun ShortcutItem(app: AppInfo, onAppClick: () -> Unit) {
     val context = LocalContext.current
     var showOptions by remember { mutableStateOf(false) }
-    var options by remember { mutableStateOf(listOf<Pair<String, () -> Unit>>()) }
+    var options by remember { mutableStateOf(listOf<ShortcutOption>()) }
 
     Row(
         modifier = Modifier
@@ -278,15 +305,29 @@ fun ShortcutItem(app: AppInfo, onAppClick: () -> Unit) {
             .combinedClickable(
                 onClick = onAppClick,
                 onLongClick = {
-                    val opts = mutableListOf<Pair<String, () -> Unit>>()
+                    val opts = mutableListOf<ShortcutOption>()
                     try {
                         val launcherApps = context.getSystemService(LauncherApps::class.java)
-                        val query = LauncherApps.ShortcutQuery().setPackage(app.packageName)
+                        val query = LauncherApps.ShortcutQuery()
+                            .setPackage(app.packageName)
+                            .setQueryFlags(
+                                LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                                        LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                            )
                         val shortcutsList = launcherApps?.getShortcuts(query, Process.myUserHandle())
                         if (!shortcutsList.isNullOrEmpty()) {
                             shortcutsList.forEach { s ->
                                 val label = s.shortLabel?.toString() ?: s.longLabel?.toString() ?: s.id
-                                opts.add(label to {
+                                var shortcutIcon: Drawable? = null
+                                try {
+                                    val getIconMethod = s::class.java.getMethod("getIcon")
+                                    val iconObj = getIconMethod.invoke(s)
+                                    if (iconObj is android.graphics.drawable.Icon) {
+                                        shortcutIcon = iconObj.loadDrawable(context)
+                                    }
+                                } catch (_: Exception) { }
+                                opts.add(ShortcutOption(label, shortcutIcon) {
                                     try {
                                         launcherApps.startShortcut(app.packageName, s.id, null, null, Process.myUserHandle())
                                     } catch (_: Exception) { }
@@ -294,8 +335,8 @@ fun ShortcutItem(app: AppInfo, onAppClick: () -> Unit) {
                             }
                         }
                     } catch (_: Exception) { }
-                    opts.add("Open" to { onAppClick() })
-                    opts.add("App info" to {
+                    opts.add(ShortcutOption("Open", null) { onAppClick() })
+                    opts.add(ShortcutOption("App info", null) {
                         try {
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${app.packageName}".toUri())
                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -324,12 +365,22 @@ fun ShortcutItem(app: AppInfo, onAppClick: () -> Unit) {
             confirmButton = {},
             text = {
                 Column {
-                    options.forEach { (label, action) ->
+                    options.forEach { opt ->
                         TextButton(onClick = {
-                            action()
+                            opt.action()
                             showOptions = false
                         }) {
-                            Text(label)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (opt.icon != null) {
+                                    Image(
+                                        bitmap = opt.icon.toBitmap().asImageBitmap(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(opt.label)
+                            }
                         }
                     }
                 }

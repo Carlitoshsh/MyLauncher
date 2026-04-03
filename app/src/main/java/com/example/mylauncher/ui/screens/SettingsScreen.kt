@@ -25,6 +25,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.provider.Settings
+import android.content.pm.PackageManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -45,14 +49,17 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
             )
         }
     ) { paddingValues ->
+        val context = LocalContext.current
+        val resolveInfo = context.packageManager.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+            PackageManager.MATCH_DEFAULT_ONLY
+        )
+        val defaultHomePackage = resolveInfo?.activityInfo?.packageName
+        val isDefaultLauncher = defaultHomePackage == context.packageName
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,6 +95,27 @@ fun SettingsScreen(
                         }
                     }
                 )
+            }
+            // Show a button to let the user set this app as the default launcher
+            if (!isDefaultLauncher) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Make default launcher", style = MaterialTheme.typography.bodyLarge)
+                    androidx.compose.material3.Button(onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (_: Exception) { }
+                    }) {
+                        Text("Set")
+                    }
+                }
             }
         }
     }
